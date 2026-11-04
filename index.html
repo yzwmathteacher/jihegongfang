@@ -117,9 +117,25 @@ input[type=range]::-moz-range-thumb{width:13px;height:13px;border-radius:50%;bac
 .svg-wrap{position:relative;padding:0;background:#FBFCFD;flex:1 1 auto;min-height:180px;overflow:hidden;}
 svg#board{position:absolute;top:0;left:10px;width:calc(100% - 20px);height:100%;display:block;}
 .toolbar{
-  display:flex;align-items:center;gap:14px;padding:10px 18px 13px;flex:none;
+  display:flex;align-items:center;gap:9px;padding:10px 18px 13px;flex:none;flex-wrap:wrap;
   border-top:1px solid var(--line2);
 }
+
+.mini-btn{
+  padding:6px 11px;border-radius:6px;border:1px solid var(--line);
+  font-size:12px;color:var(--ink2);background:#fff;flex:none;
+  transition:border-color .16s,color .16s;
+}
+.mini-btn:hover{border-color:var(--teal);color:var(--teal);}
+.speed{display:flex;border:1px solid var(--line);border-radius:6px;overflow:hidden;flex:none;}
+.speed button{padding:5px 9px;font-size:11.5px;color:var(--ink2);background:#fff;line-height:1.5;}
+.speed button+button{border-left:1px solid var(--line);}
+.speed button.on{background:var(--ink);color:#fff;}
+#btnFocus{margin-left:10px;font-size:11.5px;}
+body.focus .app{grid-template-columns:minmax(0,1fr);}
+body.focus .rail,body.focus .panel{display:none;}
+body.focus .stage{padding:14px;}
+body.focus .canvas-head h2{font-size:22px;}
 .play-btn{
   width:34px;height:34px;border-radius:50%;background:var(--red);color:#fff;
   display:grid;place-items:center;flex:none;
@@ -266,11 +282,12 @@ textarea#probText:focus{border-color:var(--teal);background:#fff;}
       <button data-stage="middle" role="tab" aria-selected="false">初中</button>
       <button data-stage="proof" role="tab" aria-selected="false">证明题</button>
     </nav>
+    <button class="mini-btn" id="btnFocus" title="只留画布，适合课堂投屏（F）">投影模式</button>
   </header>
 
   <aside class="rail">
     <div class="rail-scroll" id="topicList"></div>
-    <div class="rail-foot">参数在右侧调节，图形与数据实时联动。<br>拖动进度条可停在任意一步讲解。</div>
+    <div class="rail-foot">参数在右侧调节，图形与数据实时联动。<br>空格 播放/暂停 · ← → 分步讲解 · F 投影模式。</div>
   </aside>
 
   <main class="stage" id="stageMain"></main>
@@ -572,8 +589,9 @@ function triSideRender(P,t){
     Cx=xL+x*k; Cy=baseY-h*k;
   }
   // 两条边的摆动
-  const angA = valid ? Math.atan2(Cy-baseY, Cx-xL) : 0;
-  const angB = valid ? Math.atan2(Cy-baseY, Cx-xR) : Math.PI;
+  let angA = valid ? Math.atan2(Cy-baseY, Cx-xL) : 0;
+  let angB = valid ? Math.atan2(Cy-baseY, Cx-xR) : Math.PI;
+  if(angB<0) angB += 2*Math.PI;      // 从 π 顺时针往上摆，不走长弧
   const aa = lerp(0, angA, u);
   const ab = lerp(Math.PI, angB, u);
   const pA=[xL+s1*k*Math.cos(aa), baseY+s1*k*Math.sin(aa)];
@@ -1195,7 +1213,7 @@ function circlePerimeterRender(P,t){
   out += line(cx,cy,cx+R*Math.cos(-2*Math.PI*t),cy+R*Math.sin(-2*Math.PI*t),{stroke:COL.teal,sw:1.4});
   // 轮缘标记点
   out += dot(cx+R*Math.cos(-2*Math.PI*t), cy+R*Math.sin(-2*Math.PI*t), 5, {fill:COL.red});
-  out += dimV(cy,groundY,cx-R-14,'r = '+num(r)+'cm');
+  out += dimV(cy,groundY,Math.min(cx+R+14,878),'r = '+num(r)+'cm');
   // 起点竖线
   out += line(startX,groundY-8,startX,groundY+8,{stroke:COL.ink3,sw:1});
   if(d>20){
@@ -1276,7 +1294,10 @@ function triAreaRender(P,t){
   if(t>0.9){
     out += txt(450,baseY+92,'平行四边形 S = '+num(a*h)+'，三角形 S = ah÷2 = '+num(a*h/2)+' cm²',{size:14.5,mono:true,color:COL.red,weight:600});
   }
-  return out;
+  // 旋转过程中最高点若冲出画布，整体下移，保证不出界
+  const minY=Math.min(A2[1],B2[1],C2[1],A[1],B[1],C[1]);
+  const dy=minY<46? (46-minY):0;
+  return dy>0.5? '<g transform="translate(0,'+r2(dy)+')">'+out+'</g>' : out;
 }
 
 function trapAreaRender(P,t){
@@ -1316,54 +1337,65 @@ function trapAreaRender(P,t){
   return out;
 }
 function circleAreaRender(P,t){
-  const r=P.r, n=P.n, k=42, R=r*k;
-  const cxx=450, cyy=168;
+  const r=P.r, n=P.n, k=38, R=r*k;
+  const cxx=450, cyy=162;
   const th=2*Math.PI/n;
-  const w=R*th;
-  const yTop=cyy+R+66;
-  const xL=450-Math.PI*R/2;
+  const w=R*th;                       // 每份的弧长 = 拼接后的横向宽度
   const u=ease(t);
+  const yTop=cyy+R+44, yBase=yTop+R;
+  const xL=450-Math.PI*R/2;           // 拼接区长 = 半周长 πR
+  const segs=Math.max(6,Math.round(th*10));
   let out='';
-  // 目标长方形虚线
-  if(t>.55){
-    out += `<rect x="${r2(xL)}" y="${r2(yTop)}" width="${r2(Math.PI*R)}" height="${r2(R)}" fill="none" stroke="${COL.red}" stroke-width="1.2" stroke-dasharray="7 4" opacity="${r2(seg(t,.55,1)*.8)}"/>`;
+  // 目标长方形（虚线）
+  const op=seg(t,.82,1);
+  if(op>.02){
+    out += `<rect x="${r2(xL)}" y="${r2(yTop)}" width="${r2(Math.PI*R)}" height="${r2(R)}" fill="none" stroke="${COL.red}" stroke-width="1.2" stroke-dasharray="7 4" opacity="${r2(op*.75)}"/>`;
   }
+  // 每一份扇形：顶点 + 弧，做"平移 + 旋转"的刚体运动；按顺序一片片搬，避免中途堆成一团
+  const STAG=0.60;
   for(let i=0;i<n;i++){
-    const even = (i%2===0);
-    const j = Math.floor(i/2);
-    const a0c = i*th;
-    const p0=[cxx,cyy], rot0=near(a0c+th/2, a0c+th/2);
-    let tx, ty, trot;
-    if(even){
-      tx = xL + (j+0.5)*w; ty = yTop+R; trot = -Math.PI/2;
-    } else {
-      tx = xL + (j+1)*w;     ty = yTop;   trot = Math.PI/2;
+    const even=(i%2===0), j=Math.floor(i/2);
+    const bis=i*th+th/2;
+    const tx = even? xL+(j+0.5)*w : xL+(j+1)*w;
+    const ty = even? yBase : yTop;
+    const tb = even? -Math.PI/2 : Math.PI/2;
+    let d=tb-bis;
+    while(d>Math.PI) d-=2*Math.PI;
+    while(d<-Math.PI) d+=2*Math.PI;
+    const uu = Math.max(0, Math.min(1, (u-(i/n)*STAG)/(1-STAG)));
+    const au = uu<.5 ? 2*uu*uu : 1-Math.pow(-2*uu+2,2)/2;   // 每片的缓动
+    const ax=lerp(cxx,tx,au), ay=lerp(cyy,ty,au);
+    const rot=bis+d*au;
+    const rr=R*(1-0.02*au);
+    const pts=[[ax,ay]];
+    for(let q=0;q<=segs;q++){
+      const an=rot+(-th/2+th*q/segs);
+      pts.push([ax+rr*Math.cos(an), ay+rr*Math.sin(an)]);
     }
-    const rr = near(trot, rot0);
-    const ax = lerp(p0[0], tx, u), ay = lerp(p0[1], ty, u);
-    const rot = lerp(rot0, rr, u);
-    const pts=[];
-    const steps=5;
-    for(let q=0;q<=steps;q++){
-      const an = rot + (-th/2 + th*q/steps);
-      pts.push([ax+R*Math.cos(an), ay+R*Math.sin(an)]);
-    }
-    out += poly(pts,{fill: even?COL.tealSoft:COL.goldSoft, stroke: even?COL.teal:COL.gold, sw:1, op:.95});
+    out += poly(pts,{fill:even?COL.tealSoft:'#F6D69B', stroke:even?COL.teal:COL.gold, sw:1.1, op:.97});
   }
-  out += `<circle cx="${r2(cxx)}" cy="${r2(cyy)}" r="${r2(R)}" fill="none" stroke="${COL.ink}" stroke-width="1.4" opacity="${r2(1-u*0.7)}"/>`;
-  out += dot(cxx,cyy,3,{fill:COL.ink,op:1-u});
-  if(u>.85){
-    out += dimH(xL,xL+Math.PI*R, yTop+R+42, '≈ πr = '+num(Math.PI*r)+'cm');
-    out += dimV(yTop,yTop+R, xL-26, '≈ r = '+num(r)+'cm');
+  // 还原圆的轮廓（前段渐隐）
+  const co=Math.max(0, Math.min(1, 1-(u-(STAG-0.14))/0.24));
+  if(co>.02){
+    out += `<circle cx="${r2(cxx)}" cy="${r2(cyy)}" r="${r2(R)}" fill="none" stroke="${COL.ink}" stroke-width="1.4" opacity="${r2(co)}"/>`;
+    out += dot(cxx,cyy,3,{fill:COL.ink,op:co});
+    out += txt(cxx,cyy+R+26,'每份圆心角 = 360°÷'+n+' = '+num(360/n,1)+'°',{size:12.5,mono:true,color:COL.ink2,op:Math.min(1,co*1.4)});
   }
-  out += badge(450,72,'把圆分成 '+n+' 个小扇形，正反相拼',{color:COL.teal,bg:'#fff'});
-  if(t>0.92){
-    out += txt(450, yTop+R+86, 'S = πr² ≈ 3.14 × '+num(r)+'² = '+num(Math.PI*r*r)+' cm²', {size:15,mono:true,color:COL.red,weight:600});
+  // 拼接完成后的尺寸标注
+  if(t>.86){
+    const aop=seg(t,.72,1);
+    out += `<g opacity="${r2(aop)}">`;
+    out += dimH(xL,xL+Math.PI*R, yBase+34, '≈ πr = '+num(Math.PI*r)+' cm');
+    out += dimV(yTop,yBase, xL-26, '≈ r = '+num(r)+' cm');
+    out += `</g>`;
+  }
+  out += badge(450,72, t<.12?'先把圆平均分成 '+n+' 个小扇形' : (t>.88?'拼成的图形 ≈ 长方形：长 πr，宽 r':'一片一片搬过去，一正一反交错排开'), {color:COL.teal,bg:'#fff'});
+  if(t>.94){
+    out += txt(450, yBase+78, 'S = πr × r = πr² ≈ 3.14 × '+num(r)+'² = '+num(Math.PI*r*r)+' cm²', {size:15,mono:true,color:COL.red,weight:600});
   }
   return out;
 }
 
-/* ---------- 3D 折纸引擎（立体展开图） ---------- */
 function rotAxis3(p, anchor, axis, ang){
   const vx=p[0]-anchor[0], vy=p[1]-anchor[1], vz=p[2]-anchor[2];
   const c=Math.cos(ang), s=Math.sin(ang);
@@ -1849,19 +1881,19 @@ const PRIMARY = [
     ], dur:5200,
     render:(P,t)=>circleAreaRender(P,t),
     panel:(P,t)=>{
-      const r=P.r, n=P.n;
+      const r=P.r, n=P.n, S=Math.PI*r*r;
       return {
         formula:'S = πr²',
         calc:`S = 3.14 × ${num(r)}²`,
-        value:num(Math.PI*r*r), unit:'cm²',
+        value:num(S), unit:'cm²',
         steps:[
-          {text:'把圆平均分成 '+n+' 个小扇形。', at:0},
-          {text:'一正一反交错排列，拼成一个近似的长方形。', at:.3},
-          {text:'长方形的长 ≈ 圆周长的一半 = πr。', at:.6},
-          {text:'长方形的宽 ≈ 半径 r。', at:.78},
-          {text:`S = πr × r = πr² ≈ ${num(Math.PI*r*r)} cm²。`, at:.92}
+          {text:`把圆平均分成 ${n} 个完全一样的小扇形。`, at:0},
+          {text:`每个扇形的圆心角 = 360° ÷ ${n} = ${num(360/n,1)}°。`, at:.22},
+          {text:'一正一反交错排开，拼成一个近似的长方形。', at:.45},
+          {text:'长方形的长 ≈ 圆周长的一半 = πr；宽 ≈ 半径 r。', at:.68},
+          {text:`S = πr × r = πr² ≈ ${num(S)} cm²。`, at:.9}
         ],
-        tip:'分成的份数越多，拼出来的图形越接近长方形——这就是"化曲为直"。拖动"分成份数"对比 8 份和 48 份的形状差别。',
+        tip:'分的份数越多，弧就越接近直线段，拼出的图形越像长方形——这就是"化曲为直"。把份数从 8 拖到 48，看边缘锯齿怎么消失。周长是"围一圈的长度"，面积是"铺满的大小"，别混。',
         legend:[{c:'#2A7280',label:'朝上的扇形'},{c:'#E9A93A',label:'倒过来的扇形'}]
       };
     }
@@ -2489,9 +2521,14 @@ function renderMain(){
           <svg viewBox="0 0 24 24" id="playIcon"><path d="M8 5 L19 12 L8 19 Z" fill="#fff"/></svg>
         </button>
         <button class="ghost-btn" id="btnReplay">重新演示</button>
+        <button class="mini-btn" id="stepPrev" title="回到上一步讲解（←）">上一步</button>
+        <button class="mini-btn" id="stepNext" title="跳到下一步讲解（→）">下一步</button>
         <div class="track-wrap">
           <input type="range" class="track" id="track" min="0" max="100" step="1" value="0">
           <span class="time-label" id="timeLabel">0%</span>
+        </div>
+        <div class="speed" id="speedBox" title="演示速度">
+          <button data-sp="0.5">0.5×</button><button data-sp="1">1×</button><button data-sp="2">2×</button>
         </div>
       </div>
     </div>`;
@@ -2522,6 +2559,37 @@ function bindToolbar(){
     ST.t=(+e.target.value)/100;
     paint();
   };
+  const sp=$('#stepPrev'), sn=$('#stepNext');
+  if(sp) sp.onclick=()=>jumpStep(-1);
+  if(sn) sn.onclick=()=>jumpStep(1);
+  const box=$('#speedBox');
+  if(box){
+    $$('#speedBox button').forEach(b=>{
+      b.classList.toggle('on', (+b.getAttribute('data-sp'))===ST.speed);
+      b.onclick=()=>{
+        ST.speed=+b.getAttribute('data-sp');
+        $$('#speedBox button').forEach(x=>x.classList.toggle('on', x===b));
+      };
+    });
+  }
+}
+
+/* ---------- 分步跳转 ---------- */
+function panelStepsOf(t){
+  const tp=currentTopic();
+  return tp.panel(paramsOf(tp), t==null?ST.t:t).steps;
+}
+function jumpStep(dir){
+  const tp=currentTopic();
+  const steps=panelStepsOf();
+  if(!steps||!steps.length) return;
+  let idx=0;
+  steps.forEach((s,i)=>{ if(ST.t>=s.at-1e-9) idx=i; });
+  const target=Math.max(0, Math.min(steps.length-1, idx+dir));
+  pause();
+  if(target===steps.length-1) ST.t=1;
+  else ST.t=Math.max(0, steps[target].at)+0.004;
+  paint();
 }
 
 function setPlayIcon(playing){
@@ -2554,7 +2622,7 @@ function tick(ts){
   if(!lastTs) lastTs=ts;
   const dt=Math.min(60, ts-lastTs);
   lastTs=ts;
-  ST.t = Math.min(1, ST.t + dt/Math.max(600,tp.dur));
+  ST.t = Math.min(1, ST.t + (dt/Math.max(600,tp.dur))*(ST.speed||1));
   paint();
   if(ST.t>=1){ ST.playing=false; setPlayIcon(false); rafId=null; return; }
   rafId=requestAnimationFrame(tick);
@@ -2850,6 +2918,28 @@ function switchStage(stage){
 
 $$('#stageSwitch button').forEach(b=>{
   b.onclick=()=>switchStage(b.getAttribute('data-stage'));
+});
+
+function toggleFocus(){
+  const on=document.body.classList.toggle('focus');
+  const btn=$('#btnFocus');
+  if(btn) btn.textContent = on? '退出投影' : '投影模式';
+}
+const focusBtn=$('#btnFocus');
+if(focusBtn) focusBtn.onclick=toggleFocus;
+
+document.addEventListener('keydown', e=>{
+  const tag=(e.target&&e.target.tagName)||'';
+  if(tag==='INPUT'||tag==='TEXTAREA'||tag==='SELECT') return;
+  const k=e.key;
+  if(e.code==='Space'){ e.preventDefault(); const b=$('#btnPlay'); if(b) b.click(); return; }
+  if(k==='ArrowLeft'||k==='ArrowRight'){
+    if(ST.stage!=='proof'){ e.preventDefault(); jumpStep(k==='ArrowLeft'?-1:1); }
+    return;
+  }
+  if(k==='1'||k==='2'||k==='3'){ switchStage({'1':'primary','2':'middle','3':'proof'}[k]); return; }
+  if(k==='f'||k==='F'){ toggleFocus(); return; }
+  if(k==='r'||k==='R'){ const b=$('#btnReplay'); if(b) b.click(); }
 });
 
 renderRail();
