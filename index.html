@@ -372,7 +372,8 @@ function txt(x,y,s,o){
 
 function labelWidth(s){
   let w=0;
-  for(const ch of String(s)) w += /[\u4e00-\u9fa5]/.test(ch) ? 12.2 : 7.2;
+  const wide=/[\u4e00-\u9fa5\u25b3\u2220\u224c\u2192\u00b0\u2032\u2299\u22a5\u2225\u2248\u221a\u2460-\u2468\uff08\uff09\uff0c\uff1a\u201c\u201d\u2018\u2019]/;
+  for(const ch of String(s)) w += wide.test(ch) ? 12.2 : 7.2;
   return w;
 }
 
@@ -890,9 +891,285 @@ function midsegRender(P,t){
   return out;
 }
 
+/* ---------- 新增题型：二次函数 / 反比例 / 存在性 / 动点 / 折叠 / 旋转全等 ---------- */
+function quadStr(a,bb,cc){
+  let s='y = ';
+  s += (a===1?'':(a===-1?'-':num(a,1)))+'x²';
+  if(bb!==0) s += (bb>0?' + ':' - ')+(Math.abs(bb)===1?'':num(Math.abs(bb),1))+'x';
+  if(cc!==0) s += (cc>0?' + ':' - ')+num(Math.min(cc*1,Math.abs(cc)*Math.sign(cc)),1).replace('-','');
+  return s;
+}
+function quadRender(P,t){
+  const a0=P.a, bb=P.b, cc=P.c;
+  const a=Math.abs(a0)<0.3? (a0<0?-0.5:0.5) : a0;
+  const ox=450, oy=372, ux=46, uy=20;
+  const X=x=>ox+x*ux, Y=y=>oy-y*uy;
+  const f=x=>a*x*x+bb*x+cc;
+  const vx=-bb/(2*a), vy=f(vx);
+  const dl=bb*bb-4*a*cc;
+  let out='';
+  out += line(50,oy,850,oy,{stroke:COL.ink3,sw:1.2});
+  out += line(ox,26,ox,548,{stroke:COL.ink3,sw:1.2});
+  for(let k=-8;k<=8;k++){
+    if(k===0) continue;
+    out += line(X(k),oy-4,X(k),oy+4,{stroke:COL.ink3,sw:1});
+    if(k%2===0) out += txt(X(k),oy+16,String(k),{size:10,color:COL.ink3,mono:true});
+  }
+  for(let k=-8;k<=9;k++){
+    if(k===0) continue;
+    out += line(ox-4,Y(k),ox+4,Y(k),{stroke:COL.ink3,sw:1});
+    if(k%2===0) out += txt(ox-14,Y(k)+4,String(k),{size:10,color:COL.ink3,mono:true});
+  }
+  out += txt(ox-11,oy+15,'O',{size:11,color:COL.ink3,mono:true});
+  const xr=Math.max(0.002,7.2*ease(t));
+  let dstr='', on=false;
+  for(let i=0;i<=200;i++){
+    const x=-xr+2*xr*i/200, px=X(x), py=Y(f(x));
+    if(py>10 && py<550 && px>2 && px<898){ dstr+=(on?' L ':' M ')+r2(px)+' '+r2(py); on=true; }
+    else on=false;
+  }
+  if(dstr) out += pathEl(dstr,{stroke:COL.teal,sw:2.4});
+  if(t>0.3){
+    out += line(X(vx),40,X(vx),540,{stroke:COL.ink3,sw:1,dash:'6 5'});
+    out += txt(X(vx)+6,52,'对称轴 x = '+num(vx,2),{size:11,color:COL.ink3,anchor:'left'});
+  }
+  if(t>0.16 && Math.abs(cc)<=9){
+    out += dot(X(0),Y(cc),3.4,{fill:COL.gold});
+    out += txt(X(0)+10,Y(cc)+14,'(0,'+num(cc,1)+')',{size:10.5,color:COL.gold,anchor:'left'});
+  }
+  if(t>0.5){
+    out += dot(X(vx),Y(vy),4.2,{fill:COL.red});
+    out += txt(X(vx)+12,Y(vy)+4,'顶点('+num(vx,2)+','+num(vy,2)+')',{size:10.5,color:COL.red,anchor:'left'});
+  }
+  if(dl>=0 && t>0.58){
+    const sq=Math.sqrt(dl), rA=(-bb+sq)/(2*a), rB=(-bb-sq)/(2*a);
+    [rA,rB].forEach((rx,i)=>{
+      if(Math.abs(rx)>7.4) return;
+      out += dot(X(rx),oy,3.6,{fill:COL.red});
+      out += txt(X(rx),oy-9,'x'+(i+1)+'='+num(rx,2),{size:10,color:COL.red});
+    });
+  }
+  out += badge(300,66,quadStr(a,bb,cc),{color:COL.teal,bg:'#fff'});
+  out += badge(610,66,a>0?'a > 0 开口向上':'a < 0 开口向下',{color:COL.ink2,bg:'#fff'});
+  return out;
+}
+
+function inverseRender(P,t){
+  const k0=P.k, k=Math.abs(k0)<0.5? 1:k0;
+  const ox=450, oy=300, u=40;
+  const X=x=>ox+x*u, Y=y=>oy-y*u;
+  let out='';
+  out += line(70,oy,850,oy,{stroke:COL.ink3,sw:1.2});
+  out += line(ox,50,ox,548,{stroke:COL.ink3,sw:1.2});
+  for(let s=-1;s<=1;s+=2){
+    let d='';
+    for(let i=0;i<=170;i++){
+      const ax=0.6+(7.2)*i/170, x=s*ax, y=k/x;
+      const px=X(x), py=Y(y);
+      if(py>16 && py<548 && px>4 && px<898) d+=(d?' L ':' M ')+r2(px)+' '+r2(py);
+    }
+    if(d) out += pathEl(d,{stroke:COL.teal,sw:2.2});
+  }
+  const xp=1.3+2.6*ease(t), yp=k/xp;
+  const Px=X(xp), Py=Y(yp);
+  out += poly([[ox,oy],[Px,oy],[Px,Py],[ox,Py]],{fill:'#FBE7C2',stroke:COL.gold,sw:1.3,op:.55});
+  out += line(ox,oy,Px,Py,{stroke:COL.red,sw:1.3,dash:'4 4'});
+  out += dot(Px,Py,4,{fill:COL.red});
+  out += txt(Px+10,Py-10,'P',{size:12,color:COL.red,weight:700,anchor:'left'});
+  out += txt((ox+Px)/2, (oy+Py)/2, 'S = |k| = '+num(Math.abs(k)), {size:12.5,color:COL.red,mono:true,weight:600});
+  out += txt(Px,(oy+Py)/2+4,num(xp,2),{size:11,color:COL.ink3,mono:true,anchor:'left'});
+  out += txt(ox+8, oy-6, 'O', {size:11,color:COL.ink3,mono:true,anchor:'left'});
+  out += badge(450,66,'y = k/x，k = '+num(k),{color:COL.teal,bg:'#fff'});
+  out += badge(450,100,'P 沿曲线滑动，矩形面积始终 = |k| = '+num(Math.abs(k)),{color:COL.red,bg:'#fff'});
+  out += txt(450,542,'S矩形 = x × y = x × (k/x) = |k|',{size:13,mono:true,color:COL.red,weight:600});
+  return out;
+}
+
+function existRoots(cond){
+  const f=x=>x*x-2*x-3;
+  const g=function(x){
+    const y=f(x), dPA=Math.sqrt((x+1)*(x+1)+y*y), dPB=Math.sqrt((x-3)*(x-3)+y*y);
+    if(cond==='PA=AB') return dPA-4;
+    if(cond==='PB=AB') return dPB-4;
+    return dPA-dPB;
+  };
+  const res=[]; let px=-2.3, prev=g(px);
+  for(let i=1;i<=700;i++){
+    const x=-2.3+i*(6.6/700), cur=g(x);
+    if(Math.abs(cur)<1e-9){
+      res.push(x); prev=0; px=x; continue;
+    }
+    if(prev*cur<0){
+      let lo=px, hi=x, fl=prev;
+      for(let j=0;j<44;j++){
+        const mid=(lo+hi)/2, fm=g(mid);
+        if(fl*fm<=0) hi=mid; else { lo=mid; fl=fm; }
+      }
+      const r=(lo+hi)/2, ry=f(r);
+      const degA=Math.sqrt((r+1)*(r+1)+ry*ry)<0.25, degB=Math.sqrt((r-3)*(r-3)+ry*ry)<0.25;
+      if(!degA && !degB && (!res.length || Math.abs(res[res.length-1]-r)>1e-4)) res.push(r);
+    }
+    prev=cur; px=x;
+  }
+  return res;
+}
+function existRender(P,t){
+  const cond=P.cond, f=x=>x*x-2*x-3;
+  const ox=450, oy=300, ux=68, uy=40;
+  const X=x=>ox+x*ux, Y=y=>oy-y*uy;
+  const A=[-1,0], B=[3,0];
+  const RS=existRoots(cond);
+  let out='';
+  out += line(60,oy,850,oy,{stroke:COL.ink3,sw:1.2});
+  out += line(ox,50,ox,546,{stroke:COL.ink3,sw:1.2});
+  let d='';
+  for(let i=0;i<=220;i++){
+    const x=-2.4+i*(6.8/220), px=X(x), py=Y(f(x));
+    if(py>14 && py<546 && px>6 && px<896) d+=(d?' L ':' M ')+r2(px)+' '+r2(py);
+  }
+  if(d) out += pathEl(d,{stroke:COL.teal,sw:2.2});
+  out += dot(X(A[0]),Y(A[1]),4,{fill:COL.ink});
+  out += txt(X(A[0])-4,Y(A[1])+18,'A(-1,0)',{size:11,color:COL.ink});
+  out += dot(X(B[0]),Y(B[1]),4,{fill:COL.ink});
+  out += txt(X(B[0])+4,Y(B[1])+18,'B(3,0)',{size:11,color:COL.ink});
+  const xp=-2.3+6.6*ease(t), yp=f(xp);
+  const Px=X(xp), Py=Y(yp);
+  out += line(Px,Py,X(A[0]),Y(A[1]),{stroke:COL.gold,sw:1.6});
+  out += line(Px,Py,X(B[0]),Y(B[1]),{stroke:COL.red,sw:1.6});
+  out += dot(Px,Py,4.2,{fill:COL.teal});
+  out += txt(Px,Py-11,'P',{size:12,color:COL.teal,weight:700});
+  const dPA=Math.sqrt((xp+1)*(xp+1)+yp*yp), dPB=Math.sqrt((xp-3)*(xp-3)+yp*yp);
+  const okPA_S=Math.abs(dPA-dPB)<0.06, okPA_A=Math.abs(dPA-4)<0.06, okPB_A=Math.abs(dPB-4)<0.06;
+  const hit=(cond==='PA=PB'&&okPA_S)||(cond==='PA=AB'&&okPA_A)||(cond==='PB=AB'&&okPB_A);
+  out += txt(120,150,'PA = '+num(dPA,2),{size:12.5,mono:true,color:(cond==='PA=PB'&&okPA_S)||(cond==='PA=AB'&&okPA_A)?COL.red:COL.ink2,anchor:'left'});
+  out += txt(120,176,'PB = '+num(dPB,2),{size:12.5,mono:true,color:(cond==='PA=PB'&&okPA_S)||(cond==='PB=AB'&&okPB_A)?COL.red:COL.ink2,anchor:'left'});
+  out += txt(120,202,'AB = 4.00',{size:12.5,mono:true,color:COL.ink2,anchor:'left'});
+  out += txt(120,232,'条件：'+cond.replace('=',' = '),{size:12.5,color:COL.teal,anchor:'left',weight:600});
+  if(hit) out += badge(Px, Py-30, '成立！', {color:'#fff',bg:COL.red,bg2:'',sw:1});
+  RS.forEach((rx,i)=>{
+    if(rx>xp+0.05) return;
+    const ry=f(rx);
+    out += `<circle cx="${r2(X(rx))}" cy="${r2(Y(ry))}" r="5.4" fill="none" stroke="${COL.red}" stroke-width="1.6"/>`;
+    out += txt(X(rx), Y(ry)-13, 'P'+(i+1)+'('+num(rx,2)+','+num(ry,2)+')', {size:10,color:COL.red});
+  });
+  out += badge(450,70,'满足 '+cond+' 的点 P 共 '+RS.length+' 个',{color:COL.teal,bg:'#fff'});
+  return out;
+}
+
+function movingPointRender(P,t){
+  const b=P.b, hh=P.hh, k=38;
+  const Bx=110, By=452, Cx=Bx+b*k;
+  const AxX=Bx+b*k*0.36, AxY=By-hh*k;
+  const x=b*ease(t);
+  const Px=Bx+x*k;
+  let out='';
+  out += poly([[Bx,By],[Cx,By],[AxX,AxY]],{fill:'#fff',stroke:COL.ink3,sw:1.3});
+  out += poly([[Bx,By],[Px,By],[AxX,AxY]],{fill:'#FBE7C2',stroke:COL.red,sw:1.5,op:.85});
+  out += line(Bx,By,Cx,By,{stroke:COL.ink,sw:1.6});
+  out += txt(Bx-14,By+6,'B',{size:12.5,weight:700});
+  out += txt(Cx+14,By+6,'C',{size:12.5,weight:700});
+  out += txt(AxX,AxY-12,'A',{size:12.5,weight:700});
+  out += dot(Px,By,4,{fill:COL.red});
+  out += txt(Px,By+20,'P',{size:12.5,color:COL.red,weight:700});
+  out += line(AxX,AxY,AxX,By,{stroke:COL.ink3,sw:1,dash:'4 4'});
+  out += rightAngle(AxX,By,'u',10,{color:COL.ink3});
+  out += txt(AxX+10,(AxY+By)/2,'h = '+num(hh),{size:11,color:COL.ink3,anchor:'left'});
+  out += txt(Bx,By+40,'BP = x = '+num(x,2),{size:12,mono:true,color:COL.red,anchor:'left'});
+  const gx0=600, gy0=470, gx1=850, gy1=175;
+  out += line(gx0,gy0,gx1,gy0,{stroke:COL.ink3,sw:1.2});
+  out += line(gx0,gy0,gx0,gy1,{stroke:COL.ink3,sw:1.2});
+  const mx=v=>gx0+(v/b)*(gx1-gx0);
+  const my=s=>gy0-(s/(0.5*b*hh))*(gy0-gy1);
+  out += line(mx(0),my(0),mx(b),my(0.5*b*hh),{stroke:COL.ink3,sw:1,dash:'5 4'});
+  out += line(mx(0),my(0),mx(x),my(0.5*x*hh),{stroke:COL.red,sw:2.2});
+  out += dot(mx(x),my(0.5*x*hh),3.8,{fill:COL.red});
+  out += txt(gx0-10,gy0+16,'O',{size:11,color:COL.ink3,mono:true});
+  out += txt(gx1+14,gy0+4,'x',{size:12,color:COL.ink3,mono:true});
+  out += txt(gx0-12,gy1-4,'S',{size:12,color:COL.ink3,mono:true});
+  out += txt((gx0+gx1)/2, gy0+34, '横轴：BP 的长度 x', {size:11,color:COL.ink3});
+
+  out += badge(700,110,'S = ½ × x × h = '+num(0.5*x*hh,2),{color:COL.red,bg:'#fff'});
+  out += txt(700,140,'P 动 → 面积跟着变，图象是一条直线',{size:11,color:COL.ink2});
+  return out;
+}
+
+function foldRender(P,t){
+  const w=P.w, hh=P.hh, k=44;
+  const ax=190, ay=430;
+  const wpx=w*k, hpx=hh*k;
+  const A=[ax,ay], B=[ax+wpx,ay], C=[ax+wpx,ay-hpx], D=[ax,ay-hpx];
+  const bd=Math.sqrt(Math.max(0.5,w*w-hh*hh));
+  const Bpi=[ax+bd*k, ay-hpx];
+  const Mx=(B[0]+Bpi[0])/2, My=(B[1]+Bpi[1])/2;
+  const dx=Bpi[0]-B[0], dy=Bpi[1]-B[1];
+  const Ex=ax+wpx, Ey=My-(Ex-Mx)*dx/dy;
+  const E=[Ex,Ey];
+  const th=Math.PI*ease(t);
+  const uxx=E[0]-A[0], uyy=E[1]-A[1], ln=Math.sqrt(uxx*uxx+uyy*uyy);
+  const ex=uxx/ln, ey=uyy/ln, nx=-ey, ny=ex, cs=Math.cos(th);
+  const foldPt=function(Q){
+    const px=Q[0]-A[0], py=Q[1]-A[1];
+    const tt=px*ex+py*ey, ss=px*nx+py*ny;
+    return [A[0]+tt*ex+ss*cs*nx, A[1]+tt*ey+ss*cs*ny];
+  };
+  const Bf=foldPt(B);
+  let out='';
+  out += poly([A,E,C,D],{fill:COL.tealSoft,stroke:COL.teal,sw:1.4,op:.92});
+  out += poly([A,B,E],{fill:'none',stroke:COL.ink3,sw:1,dash:'5 4',op:.75});
+  out += poly([A,Bf,E],{fill:'#FBE7C2',stroke:COL.gold,sw:1.5,op:.92});
+  out += line(A[0],A[1],E[0],E[1],{stroke:COL.red,sw:1.8,dash:'7 4'});
+  out += txt(A[0]-16,A[1]+4,'A',{size:12.5,weight:700});
+  out += txt(B[0]+10,B[1]+4,'B',{size:12.5,weight:700});
+  out += txt(C[0]+10,C[1]-4,'C',{size:12.5,weight:700});
+  out += txt(D[0]-14,D[1]-4,'D',{size:12.5,weight:700});
+  out += txt(E[0]+12,E[1]+4,'E',{size:12.5,weight:700});
+  out += txt(Bf[0],Bf[1]-11,'B′',{size:13,color:COL.red,weight:700});
+  out += dot(Bf[0],Bf[1],3.4,{fill:COL.red});
+  if(t>0.84){
+
+    out += badge(640,300,'折痕 AE 是 BB′ 的垂直平分线',{color:COL.teal,bg:'#fff'});
+    out += badge(640,336,'AB′ = AB = '+num(w),{color:COL.red,bg:'#fff'});
+    out += badge(640,372,'EB′ = EB',{color:COL.red,bg:'#fff'});
+    out += badge(640,408,'折叠 = 关于折痕的轴对称',{color:COL.ink2,bg:'#fff'});
+  }
+  out += badge(450,70,'矩形 ABCD 沿 AE 折叠，B 落在 CD 上的 B′',{color:COL.teal,bg:'#fff'});
+  out += txt(450,540,'矩形 '+num(w)+' × '+num(hh)+'，B 折到 DC 上，AB′ = AB = '+num(w),{size:12,color:COL.ink2});
+  return out;
+}
+
+function rotateCongRender(P,t){
+  const base=P.base, r1=P.r1, r2=P.r2, k=24;
+  const A=[330,420];
+  const al=(base/2)*Math.PI/180;
+  const rot=(-30+120*ease(t))*Math.PI/180;
+  const up=-Math.PI/2;
+  const pt=function(r,ang){ return [A[0]+r*k*Math.cos(ang), A[1]+r*k*Math.sin(ang)]; };
+  const B=pt(r1,up-al), C=pt(r1,up+al), D=pt(r2,up+rot-al), E=pt(r2,up+rot+al);
+  let out='';
+  out += poly([A,B,C],{fill:COL.tealSoft,stroke:COL.teal,sw:1.4,op:.92});
+  out += poly([A,D,E],{fill:'#FBE7C2',stroke:COL.gold,sw:1.5,op:.92});
+  out += line(B[0],B[1],D[0],D[1],{stroke:COL.red,sw:1.8});
+  out += line(C[0],C[1],E[0],E[1],{stroke:COL.red,sw:1.8});
+  out += txt(A[0]-16,A[1]+6,'A',{size:12.5,weight:700});
+  out += txt(B[0]-14,B[1]+4,'B',{size:12,weight:700});
+  out += txt(C[0]+14,C[1]+4,'C',{size:12,weight:700});
+  out += txt(D[0]+14,D[1]+4,'D',{size:12,color:COL.gold,weight:700});
+  out += txt(E[0]+14,E[1]+4,'E',{size:12,color:COL.gold,weight:700});
+  const BD=Math.sqrt(Math.pow(B[0]-D[0],2)+Math.pow(B[1]-D[1],2));
+  const CE=Math.sqrt(Math.pow(C[0]-E[0],2)+Math.pow(C[1]-E[1],2));
+  out += txt((B[0]+D[0])/2+14,(B[1]+D[1])/2-6,'BD = '+num(BD,1),{size:11.5,color:COL.red,mono:true,anchor:'left'});
+  out += txt((C[0]+E[0])/2+14,(C[1]+E[1])/2+16,'CE = '+num(CE,1),{size:11.5,color:COL.red,mono:true,anchor:'left'});
+  out += badge(450,70,'△ABD ≌ △ACE（SAS）→ BD = CE',{color:COL.teal,bg:'#fff'});
+  out += badge(450,106,'旋转角 θ = '+num(rot*180/Math.PI+30,0)+'°，BD 与 CE 始终相等',{color:COL.red,bg:'#fff'});
+  out += txt(700,300,'AB = AC = '+num(r1),{size:11.5,color:COL.teal,anchor:'left'});
+  out += txt(700,326,'AD = AE = '+num(r2),{size:11.5,color:COL.gold,anchor:'left'});
+  out += txt(700,352,'∠BAD = ∠CAE = θ',{size:11.5,color:COL.ink2,anchor:'left'});
+  return out;
+}
+
 const MIDDLE = [
   {
-    id:'m-angle-sum', group:'三角形', name:'三角形的内角和', sub:'把三个角撕下来拼在一起，正好是一条直线。',
+    id:'m-angle-sum', group:'八上 · 三角形', name:'三角形的内角和', sub:'把三个角撕下来拼在一起，正好是一条直线。',
     tag:'八上 · 三角形内角和', params:[
       {k:'A',label:'∠A（度）',min:25,max:110,step:5,val:60,unit:'°'},
       {k:'B',label:'∠B（度）',min:25,max:110,step:5,val:60,unit:'°'}
@@ -916,7 +1193,7 @@ const MIDDLE = [
     }
   },
   {
-    id:'m-tri-side', group:'三角形', name:'三角形的三边关系', sub:'两条短边加起来必须比最长边长，否则围不起来。',
+    id:'m-tri-side', group:'八上 · 三角形', name:'三角形的三边关系', sub:'两条短边加起来必须比最长边长，否则围不起来。',
     tag:'八上 · 三边关系', params:[
       {k:'a',label:'边 a',min:2,max:10,step:1,val:3,unit:''},
       {k:'b',label:'边 b',min:2,max:10,step:1,val:4,unit:''},
@@ -943,7 +1220,7 @@ const MIDDLE = [
     }
   },
   {
-    id:'m-pythagoras', group:'三角形', name:'勾股定理', sub:'两个小正方形的面积之和，正好等于斜边上的大正方形。',
+    id:'m-pythagoras', group:'八下 · 勾股定理', name:'勾股定理', sub:'两个小正方形的面积之和，正好等于斜边上的大正方形。',
     tag:'八下 · 勾股定理', params:[
       {k:'a',label:'直角边 a',min:3,max:5,step:1,val:3,unit:''},
       {k:'b',label:'直角边 b',min:3,max:5,step:1,val:4,unit:''}
@@ -967,7 +1244,7 @@ const MIDDLE = [
     }
   },
   {
-    id:'m-congruent', group:'三角形', name:'全等三角形的判定', sub:'两个三角形能否完全重合？看给出的条件够不够。',
+    id:'m-congruent', group:'八上 · 三角形', name:'全等三角形的判定', sub:'两个三角形能否完全重合？看给出的条件够不够。',
     tag:'八上 · 全等三角形', params:[
       {k:'mode',label:'判定方法',type:'select',options:[['sss','SSS 边边边'],['sas','SAS 边角边'],['asa','ASA 角边角']],val:'sas'}
     ], dur:3600,
@@ -991,7 +1268,7 @@ const MIDDLE = [
     }
   },
   {
-    id:'m-similar', group:'三角形', name:'相似三角形的面积比', sub:'边长放大 k 倍，面积会放大 k 的平方倍。',
+    id:'m-similar', group:'九下 · 相似', name:'相似三角形的面积比', sub:'边长放大 k 倍，面积会放大 k 的平方倍。',
     tag:'九下 · 相似三角形', params:[{k:'k',label:'相似比 k',min:.3,max:.85,step:.05,val:.55,unit:''}],
     dur:3400,
     render:(P,t)=>similarRender(P,t),
@@ -1013,7 +1290,7 @@ const MIDDLE = [
     }
   },
   {
-    id:'m-para-diag', group:'四边形', name:'平行四边形的对角线', sub:'两条对角线互相平分——把一半旋转 180° 就能看出。',
+    id:'m-para-diag', group:'八下 · 平行四边形', name:'平行四边形的对角线', sub:'两条对角线互相平分——把一半旋转 180° 就能看出。',
     tag:'八下 · 平行四边形', params:[{k:'s',label:'倾斜程度',min:.5,max:1.4,step:.1,val:1,unit:''}],
     dur:3800,
     render:(P,t)=>paraDiagRender(P,t),
@@ -1032,7 +1309,7 @@ const MIDDLE = [
     })
   },
   {
-    id:'m-inscribed', group:'圆', name:'圆周角与圆心角', sub:'同一条弧，圆心角总是圆周角的两倍。',
+    id:'m-inscribed', group:'九上 · 圆', name:'圆周角与圆心角', sub:'同一条弧，圆心角总是圆周角的两倍。',
     tag:'九上 · 圆', params:[{k:'th',label:'圆心角 ∠AOB',min:40,max:300,step:10,val:100,unit:'°'}],
     dur:4000,
     render:(P,t)=>inscribedRender(P,t),
@@ -1051,7 +1328,7 @@ const MIDDLE = [
     })
   },
   {
-    id:'m-chord', group:'圆', name:'垂径定理', sub:'垂直于弦的直径，把弦和两条弧都平分。',
+    id:'m-chord', group:'九上 · 圆', name:'垂径定理', sub:'垂直于弦的直径，把弦和两条弧都平分。',
     tag:'九上 · 圆', params:[{k:'w',label:'弦的位置',min:50,max:160,step:10,val:120,unit:''}],
     dur:3800,
     render:(P,t)=>chordRender(P,t),
@@ -1070,7 +1347,7 @@ const MIDDLE = [
     })
   },
   {
-    id:'m-tangent', group:'圆', name:'切线的性质', sub:'圆心到切线的距离正好等于半径，切线垂直于过切点的半径。',
+    id:'m-tangent', group:'九上 · 圆', name:'切线的性质', sub:'圆心到切线的距离正好等于半径，切线垂直于过切点的半径。',
     tag:'九上 · 圆', params:[{k:'n',label:'扫描',min:0,max:1,step:.1,val:1,unit:''}],
     dur:4200,
     render:(P,t)=>tangentRender(P,t),
@@ -1093,7 +1370,7 @@ const MIDDLE = [
     }
   },
   {
-    id:'m-midseg', group:'三角形', name:'三角形中位线定理', sub:'连接两边中点，这条线平行于第三边，长度是它的一半。',
+    id:'m-midseg', group:'八下 · 平行四边形', name:'三角形中位线定理', sub:'连接两边中点，这条线平行于第三边，长度是它的一半。',
     tag:'八下 · 中位线', params:[],
     dur:4000,
     render:(P,t)=>midsegRender(P,t),
@@ -1110,6 +1387,157 @@ const MIDDLE = [
       ],
       tip:'中位线把三角形分成 1:3 的两部分（面积比）。三条中位线围成的三角形面积是原三角形的 1/4。',
       legend:[{c:'#2A7280',label:'原三角形'},{c:'#D8462E',label:'旋转后的 △CFE'}]
+    })
+  }
+  ,
+  {
+    id:'m-func-quad', group:'九上 · 二次函数', name:'二次函数图象与系数', sub:'拖 a、b、c，看开口、对称轴、顶点、交点怎么跟着变。',
+    tag:'九上 · 二次函数 y=ax²+bx+c', params:[
+      {k:'a',label:'二次项系数 a',min:-2,max:2,step:.5,val:1},
+      {k:'b',label:'一次项系数 b',min:-4,max:4,step:1,val:0},
+      {k:'c',label:'常数项 c',min:-4,max:4,step:1,val:-3}
+    ], dur:5200,
+    render:(P,t)=>quadRender(P,t),
+    panel:(P,t)=>{
+      const a0=P.a, bb=P.b, cc=P.c;
+      const a=Math.abs(a0)<0.3? (a0<0?-0.5:0.5) : a0;
+      const vx=-bb/(2*a), vy=a*vx*vx+bb*vx+cc, dl=bb*bb-4*a*cc;
+      return {
+        formula:'y = ax² + bx + c',
+        calc:quadStr(a,bb,cc),
+        value:`(${num(vx,2)}, ${num(vy,2)})`, unit:'顶点',
+        steps:[
+          {text:`a = ${num(a,1)}，${a>0?'开口向上，有最低点':'开口向下，有最高点'}。`, at:0},
+          {text:`对称轴：x = −b/2a = ${num(vx,2)}。`, at:.34},
+          {text:`顶点 (${num(vx,2)}, ${num(vy,2)})，是图象的最高/最低点。`, at:.55},
+          {text:`与 y 轴交于 (0, ${num(cc,1)})，c 就是纵截距。`, at:.72},
+          {text:`Δ = b²−4ac = ${num(dl,2)}，与 x 轴有 ${dl>0?'2':(dl===0?'1':'0')} 个交点。`, at:.88}
+        ],
+        tip:'a 只管开口（正上负下，|a| 越大越"瘦"）；b 和 a 一起决定对称轴位置（左同右异）；c 只看纵截距。判断图象先定开口，再找对称轴，最后看交点。',
+        legend:[{c:'#2A7280',label:'抛物线'},{c:'#D8462E',label:'顶点与交点'}]
+      };
+    }
+  },
+  {
+    id:'m-func-inverse', group:'九下 · 反比例函数', name:'反比例函数 k 的几何意义', sub:'曲线上任一点作两轴垂线，围出的矩形面积恒等于 |k|。',
+    tag:'九下 · 反比例函数 y=k/x', params:[
+      {k:'k',label:'比例系数 k',min:-6,max:6,step:1,val:4}
+    ], dur:5000,
+    render:(P,t)=>inverseRender(P,t),
+    panel:(P,t)=>{
+      const k=Math.abs(P.k)<0.5?1:P.k;
+      return {
+        formula:'S矩形 = |k|',
+        calc:`k = ${num(k)}，矩形面积 = x × y`,
+        value:num(Math.abs(k)), unit:'（面积单位）',
+        steps:[
+          {text:'在双曲线 y = k/x 上任取一点 P(x, y)。', at:0},
+          {text:'过 P 向 x 轴、y 轴作垂线，围成一个矩形。', at:.3},
+          {text:'矩形的长是 |x|，宽是 |y|，面积 = |x| × |y| = |x × k/x| = |k|。', at:.6},
+          {text:'P 怎么滑动，面积都不变——这就是 k 的几何意义。', at:.85}
+        ],
+        tip:'k 决定象限：k>0 在一、三象限，k<0 在二、四象限。|k| 越大，曲线离原点越远。常见考题：已知矩形面积求 k，注意符号。',
+        legend:[{c:'#FBE7C2',label:'矩形（面积=|k|）'},{c:'#2A7280',label:'双曲线'}]
+      };
+    }
+  },
+  {
+    id:'m-func-exist', group:'九上 · 二次函数', name:'图象上点的存在性', sub:'点 P 沿抛物线滑动，什么时候 PA=PB / PA=AB？',
+    tag:'九上 · 二次函数与三角形存在性', params:[
+      {k:'cond',label:'判定条件',type:'select',options:[['PA=PB','PA = PB'],['PA=AB','PA = AB'],['PB=AB','PB = AB']],val:'PA=PB'}
+    ], dur:6200,
+    render:(P,t)=>existRender(P,t),
+    panel:(P,t)=>{
+      const cond=P.cond, RS=existRoots(cond);
+      const list=RS.slice(0,4).map((x,i)=>'P'+(i+1)+'('+num(x,2)+', '+num(x*x-2*x-3,2)+')').join('、');
+      return {
+        formula:'PA = PB 或 PA = AB 或 PB = AB',
+        calc:'抛物线 y = x² − 2x − 3，A(−1,0)、B(3,0)，AB = 4',
+        value:RS.length, unit:'个满足条件的点',
+        steps:[
+          {text:'先把抛物线画出来，标出 A(−1,0)、B(3,0)，AB = 4。', at:0},
+          {text:'让点 P 沿抛物线从头滑到尾，同时盯着 PA、PB 的长度。', at:.25},
+          {text:'长度一旦出现相等，就把这个位置记下来。', at:.55},
+          {text:list?`找到：${list}。`:'这一路没有找到满足条件的点。', at:.78},
+          {text:'存在性问题就这么做：先把"相等"翻译成方程，再解，最后代回检验。', at:.9}
+        ],
+        tip:'三种等腰情形要分开算：PA=PB 用"到两点距离相等＝在垂直平分线上"；PA=AB、PB=AB 用"圆与抛物线的交点"。别漏掉 P 在 x 轴下方的情况。',
+        legend:[{c:'#2A7280',label:'抛物线'},{c:'#D8462E',label:'满足条件的点'}]
+      };
+    }
+  },
+  {
+    id:'m-moving-point', group:'八下 · 一次函数与动点', name:'动点问题：面积随位置变化', sub:'点 P 在 BC 上跑，△ABP 的面积跟着变，图象是一条直线。',
+    tag:'八下 · 动点与函数图象', params:[
+      {k:'b',label:'底 BC',min:4,max:9,step:1,val:6},
+      {k:'hh',label:'高 h',min:2,max:5,step:1,val:4}
+    ], dur:5600,
+    render:(P,t)=>movingPointRender(P,t),
+    panel:(P,t)=>{
+      const b=P.b, hh=P.hh;
+      return {
+        formula:'S = ½ × x × h',
+        calc:`S = ½ × ${b} × ${hh}`,
+        value:num(0.5*b*hh), unit:'cm²（最大面积）',
+        steps:[
+          {text:'点 P 从 B 出发，沿 BC 匀速向 C 移动，设 BP = x。', at:0},
+          {text:'△ABP 的底是 x，高始终是 h（因为 A 到 BC 的距离不变）。', at:.3},
+          {text:`S = ½ × x × h = ${num(0.5*hh)}x，是 x 的一次函数。`, at:.55},
+          {text:'把每个位置的面积描到右边的坐标系里，得到一条过原点的直线。', at:.75},
+          {text:`x 最大到 BC = ${b}，此时 S = ${num(0.5*b*hh)} cm²。`, at:.9}
+        ],
+        tip:'动点题的关键：找不变量。这里底在变、高不变，所以面积和 x 成正比。如果 P 跑到射线 BC 的延长线上，x 会继续增大，图象也就继续延长。',
+        legend:[{c:'#FBE7C2',label:'随 P 变化的面积'},{c:'#D8462E',label:'面积函数图象'}]
+      };
+    }
+  },
+  {
+    id:'m-fold', group:'八下 · 平行四边形', name:'折叠问题', sub:'矩形沿折痕翻折，对应边相等、对应角相等，折痕是垂直平分线。',
+    tag:'八下 · 折叠（轴对称）', params:[
+      {k:'w',label:'宽 AB',min:7,max:9,step:1,val:8},
+      {k:'hh',label:'高 AD',min:3,max:5,step:1,val:4}
+    ], dur:5600,
+    render:(P,t)=>foldRender(P,t),
+    panel:(P,t)=>{
+      const w=P.w, hh=P.hh;
+      const bd=Math.sqrt(Math.max(0.5,w*w-hh*hh));
+      return {
+        formula:'AB′ = AB，EB′ = EB，AE ⊥ BB′',
+        calc:`矩形 ${w}×${hh}，AB = ${w}，AD = ${hh}`,
+        value:w, unit:'折叠后 AB′ 仍等于 AB',
+        steps:[
+          {text:'矩形 ABCD，沿 AE 折叠，让 B 落在边 CD 上的 B′。', at:0},
+          {text:'折叠是轴对称：AB′ = AB，EB′ = EB，∠AB′E = ∠B = 90°。', at:.3},
+          {text:'折痕 AE 就是 BB′ 的垂直平分线。', at:.55},
+          {text:`求 B′ 的位置：AB′ = ${w}，AD = ${hh}，所以 DB′ = √(${w}²−${hh}²) ≈ ${num(bd,2)}。`, at:.78},
+          {text:'折叠题套路：先标出所有等量，再用勾股定理列方程。', at:.9}
+        ],
+        tip:'折叠题三件套：① 折叠前后全等，边角都相等；② 折痕垂直平分对应点的连线；③ 设未知数，在一个直角三角形里用勾股定理。',
+        legend:[{c:'#D6E7EA',label:'没动的那块'},{c:'#FBE7C2',label:'折过去的那块'}]
+      };
+    }
+  },
+  {
+    id:'m-rotate-congruent', group:'八上 · 三角形', name:'旋转型全等（手拉手模型）', sub:'两个等腰三角形共顶点，转一个，两条连线始终相等。',
+    tag:'八上 · 全等三角形（旋转型）', params:[
+      {k:'base',label:'顶角 ∠A',min:30,max:90,step:10,val:60},
+      {k:'r1',label:'腰 AB = AC',min:5,max:9,step:1,val:7},
+      {k:'r2',label:'腰 AD = AE',min:3,max:6,step:1,val:5}
+    ], dur:5600,
+    render:(P,t)=>rotateCongRender(P,t),
+    panel:(P,t)=>({
+      formula:'BD = CE',
+      calc:'AB = AC，AD = AE，∠BAD = ∠CAE',
+      value:'', unit:'',
+      steps:[
+        {text:'△ABC 与 △ADE 都是等腰三角形，共顶点 A，且顶角相同。', at:0},
+        {text:'把 △ADE 绕点 A 旋转，转到任何角度都行。', at:.28},
+        {text:'旋转时 ∠BAD 和 ∠CAE 始终相等（都等于旋转角 θ）。', at:.55},
+        {text:'AB = AC、AD = AE、夹角相等 → 边角边判定。', at:.75},
+        {text:'所以 △ABD ≌ △ACE，对应边 BD = CE。', at:.9}
+      ],
+      tip:'"手拉手"模型的识别特征：两个等腰三角形（或正方形、等边三角形）共用一个顶点。证法固定——先找两组等边，再证夹角相等，最后 SAS。',
+      legend:[{c:'#D6E7EA',label:'△ABC'},{c:'#FBE7C2',label:'△ADE（在转）'}]
     })
   }
 ];
@@ -1336,7 +1764,49 @@ function trapAreaRender(P,t){
   }
   return out;
 }
+function circleRingRender(P,t){
+  const r=P.r, R=r*38;
+  const m=Math.max(6,Math.min(16,Math.round(P.n/3)));
+  const cx=450, cy=140, yBase=470, dr=R/m;
+  const u=ease(t);
+  let out='';
+  // 目标三角形虚线
+  const triOp=r2(seg(t,.72,1)*.85);
+  if(t>.72){
+    out += poly([[cx-Math.PI*R,yBase],[cx+Math.PI*R,yBase],[cx,yBase-R]],{fill:'none',stroke:COL.red,sw:1.2,dash:'7 4',op:triOp});
+  }
+  for(let i=0;i<m;i++){
+    const rho=R*(i+1)/m;
+    const L=2*Math.PI*rho;
+    const ty=yBase-R+rho;
+    const dly=(1-i/(m-1))*0.34;
+    const ui=clamp((u-dly)/0.5,0,1);
+    const eu=ui<.5?2*ui*ui:1-Math.pow(-2*ui+2,2)/2;
+    if(eu<0.99){
+      out += `<circle cx="${r2(cx)}" cy="${r2(cy)}" r="${r2(rho)}" fill="none" stroke="${i%2?'#D8B06A':COL.teal}" stroke-width="${r2(dr*0.92)}" opacity="${r2((1-eu)*.92)}"/>`;
+    }
+    if(eu>0.01){
+      const w=L*eu, y=lerp(cy,ty,eu);
+      out += `<rect x="${r2(cx-w/2)}" y="${r2(y-dr*0.46)}" width="${r2(w)}" height="${r2(dr*0.92)}" fill="${i%2?'#F6D69B':COL.tealSoft}" stroke="${i%2?COL.gold:COL.teal}" stroke-width=".8" opacity="${r2(.35+.65*eu)}"/>`;
+    }
+  }
+  if(u<.5) out += `<circle cx="${cx}" cy="${cy}" r="${R}" fill="none" stroke="${COL.ink}" stroke-width="1.3" opacity="${r2(Math.max(0,1-u*2.4))}"/>`;
+  if(t<.05) out += txt(cx, cy+R+26, '把圆切成一层层同心的细圆环', {size:12,color:COL.ink2});
+  if(t>.78){
+    out += dimH(cx-Math.PI*R, cx+Math.PI*R, yBase+36, '底 = 2πr ≈ '+num(2*Math.PI*r));
+    out += dimV(yBase-R, yBase, cx-Math.PI*R-16, '高 = r = '+num(r));
+  }
+  if(t>.9){
+    out += txt(cx, yBase+80, 'S = ½ × 2πr × r = πr² ≈ '+num(Math.PI*r*r)+' cm²', {size:15,mono:true,color:COL.red,weight:600});
+  }
+  const msg = t<.18? '按半径分圆环' : (t<.72? '每层环拉直成一条长方形' : '从长到短叠起来 → 三角形');
+  out += badge(cx,74,msg,{color:COL.teal,bg:'#fff'});
+  out += txt(cx,74+0,'',{});
+  return out;
+}
+
 function circleAreaRender(P,t){
+  if(P.mode==='ring') return circleRingRender(P,t);
   const r=P.r, n=P.n, k=38, R=r*k;
   const cxx=450, cyy=162;
   const th=2*Math.PI/n;
@@ -1664,39 +2134,60 @@ function cylinderVolumeRender(P,t){
   return out;
 }
 
+function coneWaterShape(cx,baseY,R,ry,wr,wh){
+  const pts=[[cx-R,baseY],[cx-wr,baseY-wh],[cx+wr,baseY-wh],[cx+R,baseY]];
+  for(let i=0;i<=10;i++){ const a=Math.PI*i/10; pts.push([cx+R*Math.cos(a),baseY+ry*Math.sin(a)]); }
+  let out=poly(pts,{fill:'#BFDCE4',stroke:'none',op:.95});
+  if(wh>8 && wr>3) out+=ellipseEl(cx,baseY-wh,wr,Math.max(2,ry*wr/R),{stroke:COL.teal,sw:1,fill:'#DCEDF2'});
+  return out;
+}
 function coneVolumeRender(P,t){
-  const r=P.r, h=P.h, k=30, R=r*k, H=h*k;
-  const cylX=300, coneX=600, baseY=420;
-  const u=t*3;
-  const step=Math.min(2, Math.floor(u));
-  const loc=clamp(u-step,0,1);
-  const level=(step+ease(loc))/3;
-  const ry=R*0.28;
-  let out='';
-  // 圆柱
+  const r=P.r,h=P.h,k=26,R=r*k,H=h*k;
+  const cylX=640, coneX=245, baseY=432;
+  const u=t*3, step=Math.min(2,Math.floor(u)), loc=clamp(u-step,0,1);
+  const lvl=(step+ease(loc))/3;
+  const fillFrac=1-ease(loc);
+  const ry=R*0.26;
   const cyTop=baseY-H;
-  out += ellipseEl(cylX,baseY,R,ry,{stroke:COL.ink,sw:1.5,fill:COL.goldSoft});
-  out += line(cylX-R,baseY,cylX-R,cyTop,{stroke:COL.ink,sw:1.4});
-  out += line(cylX+R,baseY,cylX+R,cyTop,{stroke:COL.ink,sw:1.4});
-  const fh=H*level;
+  let out='';
+  out += ellipseEl(cylX,baseY,R,ry,{stroke:COL.ink,sw:1.5,fill:'#fff'});
+  out += line(cylX-R,baseY,cylX-R,cyTop,{stroke:COL.ink,sw:1.5});
+  out += line(cylX+R,baseY,cylX+R,cyTop,{stroke:COL.ink,sw:1.5});
+  const fh=H*lvl;
   if(fh>2){
     out += cylBody(cylX,baseY,R,ry,fh);
-    out += ellipseEl(cylX,baseY-fh,R,ry,{stroke:COL.teal,sw:1.2,fill:'#fff',op:.9});
+    out += ellipseEl(cylX,baseY-fh,R,ry,{stroke:COL.teal,sw:1.2,fill:'#DCEDF2',op:.95});
+    out += txt(cylX,baseY-fh-10,num(lvl*100,0)+'%',{size:12,mono:true,color:COL.teal,weight:600});
   }
-  out += ellipseEl(cylX,cyTop,R,ry,{stroke:COL.ink,sw:1.5,fill:'none'});
-  out += txt(cylX,baseY+ry+30,'圆柱',{size:12,color:COL.ink2});
-  // 圆锥
-  const tilt = loc*26;
-  const apex=[coneX, baseY-H];
-  out += ellipseEl(coneX,baseY,R,ry,{stroke:COL.ink,sw:1.5,fill:COL.goldSoft});
-  out += poly([[coneX-R,baseY],[coneX,baseY-H],[coneX+R,baseY]],{fill:COL.redSoft,stroke:COL.red,sw:1.6});
-  out += txt(coneX,baseY+ry+30,'等底等高的圆锥',{size:12,color:COL.ink2});
-  // 倒水提示
-  out += txt((cylX+coneX)/2, baseY-H-30, '→', {size:26,color:COL.red,weight:600,op:.7});
-  out += badge(450,74,'第 '+(step+1)+' 次倒满：圆锥容积 = 圆柱的 1/3',{color:COL.teal,bg:'#fff'});
-  out += badge(cylX, cyTop-38, num(level*100,0)+'%', {color:COL.red,bg:'#fff'});
+  out += ellipseEl(cylX,cyTop,R,ry,{stroke:COL.ink,sw:1.5,op:.85});
+  [[1/3,'1/3'],[2/3,'2/3']].forEach(function(pr){
+    const y=baseY-H*pr[0];
+    out += line(cylX+R+6,y,cylX+R+20,y,{stroke:COL.ink3,sw:1});
+    out += txt(cylX+R+26,y+4,pr[1],{size:10.5,color:COL.ink3,mono:true,anchor:'left'});
+  });
+  out += txt(cylX,baseY+ry+34,'圆柱（等底等高）',{size:12,color:COL.ink2});
+  const apexX=coneX, apexY=baseY-H;
+  out += ellipseEl(coneX,baseY,R,ry,{stroke:COL.ink,sw:1.4,fill:'#fff'});
+  if(fillFrac>0.02) out += coneWaterShape(coneX,baseY,R,ry,R*(1-fillFrac),H*fillFrac);
+  out += line(coneX-R,baseY,apexX,apexY,{stroke:COL.ink,sw:1.6});
+  out += line(coneX+R,baseY,apexX,apexY,{stroke:COL.ink,sw:1.6});
+  out += txt(coneX,baseY+ry+34,'圆锥（装满水）',{size:12,color:COL.ink2});
+  if(loc>0.03 && loc<0.97){
+    const p0=[coneX+R-6, apexY+18], p1=[cylX-R-8, cyTop-16];
+    out += `<path d="M ${r2(p0[0])} ${r2(p0[1])} Q ${r2((p0[0]+p1[0])/2)} ${r2(p0[1]-70)} ${r2(p1[0])} ${r2(p1[1])}" fill="none" stroke="${COL.red}" stroke-width="1.4" stroke-dasharray="7 6" opacity=".8"/>`;
+    out += poly([[p1[0]-9,p1[1]-2],[p1[0]+1,p1[1]+12],[p1[0]+9,p1[1]-3]],{fill:COL.red,op:.85});
+  }
+  out += line(coneX+R-4,baseY,cylX-R+4,baseY,{stroke:COL.ink3,sw:1,dash:'5 5',op:.8});
+  out += badge((coneX+cylX)/2, baseY+62, '等底 · 等高', {color:COL.ink2,bg:'#fff'});
+  out += line(coneX-R-24,baseY,coneX-R-24,apexY,{stroke:COL.ink3,sw:1,dash:'4 4'});
+  out += line(coneX-R-24,apexY,coneX-R-6,apexY,{stroke:COL.ink3,sw:1,dash:'4 4'});
+  out += txt(coneX-R-30,(baseY+apexY)/2,'h',{size:12,mono:true,color:COL.ink3});
+  const msg = t<0.02? '圆锥装满水，倒进等底等高的圆柱'
+            : (step>=2 && loc>0.92 ? '正好倒满：圆锥容积 = 圆柱的 1/3' : '第 '+(step+1)+' 次倒水');
+  out += badge(450,74,msg,{color:COL.teal,bg:'#fff'});
+  out += badge(450,112,'已倒 '+step+' 次'+(step>0?'，圆柱装了 '+step+' 个圆锥的水':''),{color:COL.red,bg:'#fff'});
   if(t>0.9){
-    out += txt(450,baseY+96,'V锥 = πr²h ÷ 3 ≈ '+num(Math.PI*r*r*h/3)+' cm³',{size:15,mono:true,color:COL.red,weight:600});
+    out += txt(450, baseY+104, 'V锥 = 1/3 × πr²h ≈ '+num(Math.PI*r*r*h/3)+' cm³', {size:14.5,mono:true,color:COL.red,weight:600});
   }
   return out;
 }
@@ -1704,7 +2195,7 @@ function coneVolumeRender(P,t){
 /* ---------- 模块注册 ---------- */
 const PRIMARY = [
   {
-    id:'p-perim-rect', group:'周长', name:'长方形的周长', sub:'沿着四条边量一整圈，就是周长。拖动进度看红点走过的路径。',
+    id:'p-perim-rect', group:'三上 · 周长', name:'长方形的周长', sub:'沿着四条边量一整圈，就是周长。拖动进度看红点走过的路径。',
     tag:'三上 · 长方形周长', params:[
       {k:'a',label:'长 a',min:2,max:9,step:1,val:6,unit:'cm'},
       {k:'b',label:'宽 b',min:2,max:6,step:1,val:4,unit:'cm'}
@@ -1728,7 +2219,7 @@ const PRIMARY = [
     }
   },
   {
-    id:'p-perim-square', group:'周长', name:'正方形的周长', sub:'四条边一样长，所以周长是边长的 4 倍。',
+    id:'p-perim-square', group:'三上 · 周长', name:'正方形的周长', sub:'四条边一样长，所以周长是边长的 4 倍。',
     tag:'三上 · 正方形周长', params:[{k:'a',label:'边长 a',min:2,max:8,step:1,val:5,unit:'cm'}],
     dur:3000,
     render:(P,t)=>perimRender(P,t,true),
@@ -1750,7 +2241,7 @@ const PRIMARY = [
     }
   },
   {
-    id:'p-perim-circle', group:'周长', name:'圆的周长', sub:'让圆在地上滚一整圈，红线有多长，周长就有多长。',
+    id:'p-perim-circle', group:'六上 · 圆的周长', name:'圆的周长', sub:'让圆在地上滚一整圈，红线有多长，周长就有多长。',
     tag:'六上 · 圆的周长', params:[{k:'r',label:'半径 r',min:1,max:3,step:.5,val:2,unit:'cm'}],
     dur:4600,
     render:(P,t)=>circlePerimeterRender(P,t),
@@ -1772,7 +2263,7 @@ const PRIMARY = [
     }
   },
   {
-    id:'p-area-rect', group:'面积', name:'长方形的面积', sub:'用 1cm² 的小方格铺满，数一数有多少个，就是面积。',
+    id:'p-area-rect', group:'三下 · 面积', name:'长方形的面积', sub:'用 1cm² 的小方格铺满，数一数有多少个，就是面积。',
     tag:'三下 · 长方形面积', params:[
       {k:'a',label:'长 a',min:2,max:8,step:1,val:6,unit:'cm'},
       {k:'b',label:'宽 b',min:2,max:5,step:1,val:3,unit:'cm'}
@@ -1796,7 +2287,7 @@ const PRIMARY = [
     }
   },
   {
-    id:'p-area-para', group:'面积', name:'平行四边形的面积', sub:'沿高剪下一个三角形，平移到右边，就变成长方形。',
+    id:'p-area-para', group:'五上 · 多边形的面积', name:'平行四边形的面积', sub:'沿高剪下一个三角形，平移到右边，就变成长方形。',
     tag:'五上 · 平行四边形面积', params:[
       {k:'a',label:'底 a',min:3,max:8,step:1,val:6,unit:'cm'},
       {k:'h',label:'高 h',min:2,max:5,step:1,val:3,unit:'cm'},
@@ -1822,7 +2313,7 @@ const PRIMARY = [
     }
   },
   {
-    id:'p-area-tri', group:'面积', name:'三角形的面积', sub:'两个完全一样的三角形，旋转拼成一个平行四边形。',
+    id:'p-area-tri', group:'五上 · 多边形的面积', name:'三角形的面积', sub:'两个完全一样的三角形，旋转拼成一个平行四边形。',
     tag:'五上 · 三角形面积', params:[
       {k:'a',label:'底 a',min:3,max:8,step:1,val:6,unit:'cm'},
       {k:'h',label:'高 h',min:2,max:5,step:1,val:4,unit:'cm'},
@@ -1848,7 +2339,7 @@ const PRIMARY = [
     }
   },
   {
-    id:'p-area-trap', group:'面积', name:'梯形的面积', sub:'两个完全一样的梯形，倒过来拼成平行四边形。',
+    id:'p-area-trap', group:'五上 · 多边形的面积', name:'梯形的面积', sub:'两个完全一样的梯形，倒过来拼成平行四边形。',
     tag:'五上 · 梯形面积', params:[
       {k:'a',label:'上底 a',min:1,max:5,step:1,val:3,unit:'cm'},
       {k:'b',label:'下底 b',min:3,max:8,step:1,val:6,unit:'cm'},
@@ -1874,14 +2365,32 @@ const PRIMARY = [
     }
   },
   {
-    id:'p-area-circle', group:'面积', name:'圆的面积', sub:'把圆剪成许多小扇形，正反相拼，接近一个长方形。',
+    id:'p-area-circle', group:'六上 · 圆的面积', name:'圆的面积', sub:'两种拼法：剪成小扇形拼成长方形，或把圆环拉直叠成三角形。',
     tag:'六上 · 圆的面积', params:[
       {k:'r',label:'半径 r',min:1,max:2.6,step:.2,val:2,unit:'cm'},
-      {k:'n',label:'分成份数',min:8,max:48,step:8,val:24,unit:''}
+      {k:'n',label:'分成份数',min:8,max:48,step:8,val:24,unit:''},
+      {k:'mode',label:'演示方式',type:'select',options:[['rect','剪拼成长方形'],['ring','圆环展开成三角形']],val:'rect'}
     ], dur:5200,
     render:(P,t)=>circleAreaRender(P,t),
     panel:(P,t)=>{
       const r=P.r, n=P.n, S=Math.PI*r*r;
+      const m=Math.max(6,Math.min(16,Math.round(n/3)));
+      if(P.mode==='ring'){
+        return {
+          formula:'S = ½ × 2πr × r',
+          calc:`S = ½ × ${num(2*Math.PI*r)} × ${num(r)}`,
+          value:num(S), unit:'cm²',
+          steps:[
+            {text:`把圆按半径切成 ${m} 个同心的细圆环。`, at:0},
+            {text:'每个圆环剪开拉直，正好是一条长方形：长 = 那个圆的周长 2πρ，宽 = 环的厚度。', at:.3},
+            {text:'把圆环从外到内、由长到短叠起来。', at:.55},
+            {text:'叠成的图形是个三角形：底 = 最外圈的周长 2πr，高 = 半径 r。', at:.78},
+            {text:`S = ½ × 底 × 高 = ½ × 2πr × r = πr² ≈ ${num(S)} cm²。`, at:.9}
+          ],
+          tip:'同一件事的两种看法：扇形法把圆"切成小披萨"再拼成长方形；圆环法把圆"卷成一层层纸"再展开成三角形。两个角度都能得到 πr²，说明这个公式不是背出来的。',
+          legend:[{c:'#D6E7EA',label:'朝外拉直的环'},{c:'#F6D69B',label:'隔层相错的环'}]
+        };
+      }
       return {
         formula:'S = πr²',
         calc:`S = 3.14 × ${num(r)}²`,
@@ -1899,7 +2408,7 @@ const PRIMARY = [
     }
   },
   {
-    id:'p-net-cube', group:'立体·展开图', name:'正方体的展开图', sub:'六个面沿棱翻折摊平，看清"哪两个面是相对面"。',
+    id:'p-net-cube', group:'五下 · 长方体和正方体', name:'正方体的展开图', sub:'六个面沿棱翻折摊平，看清"哪两个面是相对面"。',
     tag:'五下 · 正方体展开图', params:[{k:'a',label:'棱长',min:2,max:6,step:1,val:4,unit:'cm'}],
     dur:5000, paper:false,
     render:(P,t)=>unfoldRender(boxScene(P.a,P.a,P.a), t),
@@ -1921,7 +2430,7 @@ const PRIMARY = [
     }
   },
   {
-    id:'p-net-cuboid', group:'立体·展开图', name:'长方体的展开图', sub:'长、宽、高不同，展开后的长方形尺寸也跟着变。',
+    id:'p-net-cuboid', group:'五下 · 长方体和正方体', name:'长方体的展开图', sub:'长、宽、高不同，展开后的长方形尺寸也跟着变。',
     tag:'五下 · 长方体展开图', params:[
       {k:'a',label:'长',min:3,max:6,step:1,val:5,unit:'cm'},
       {k:'b',label:'宽',min:2,max:5,step:1,val:3,unit:'cm'},
@@ -1946,7 +2455,7 @@ const PRIMARY = [
     }
   },
   {
-    id:'p-net-cyl', group:'立体·展开图', name:'圆柱的展开图', sub:'侧面展开是一个长方形：长 = 底面周长，宽 = 高。',
+    id:'p-net-cyl', group:'六下 · 圆柱与圆锥', name:'圆柱的展开图', sub:'侧面展开是一个长方形：长 = 底面周长，宽 = 高。',
     tag:'六下 · 圆柱展开图', params:[
       {k:'r',label:'底面半径 r',min:1,max:2.5,step:.5,val:2,unit:'cm'},
       {k:'h',label:'高 h',min:2,max:5,step:1,val:4,unit:'cm'}
@@ -1971,7 +2480,7 @@ const PRIMARY = [
     }
   },
   {
-    id:'p-net-cone', group:'立体·展开图', name:'圆锥的展开图', sub:'侧面展开是扇形，扇形半径就是母线 l。',
+    id:'p-net-cone', group:'六下 · 圆柱与圆锥', name:'圆锥的展开图', sub:'侧面展开是扇形，扇形半径就是母线 l。',
     tag:'六下 · 圆锥展开图', params:[
       {k:'r',label:'底面半径 r',min:1,max:2.5,step:.5,val:2,unit:'cm'},
       {k:'h',label:'高 h',min:2,max:5,step:1,val:4,unit:'cm'}
@@ -1996,7 +2505,7 @@ const PRIMARY = [
     }
   },
   {
-    id:'p-vol-cuboid', group:'立体·体积', name:'长方体与正方体的体积', sub:'一个小正方体一个小正方体地放进去，数一共放了多少个。',
+    id:'p-vol-cuboid', group:'五下 · 长方体和正方体', name:'长方体与正方体的体积', sub:'一个小正方体一个小正方体地放进去，数一共放了多少个。',
     tag:'五下 · 体积', params:[
       {k:'a',label:'长',min:1,max:4,step:1,val:3,unit:'cm'},
       {k:'b',label:'宽',min:1,max:4,step:1,val:2,unit:'cm'},
@@ -2022,7 +2531,7 @@ const PRIMARY = [
     }
   },
   {
-    id:'p-vol-cyl', group:'立体·体积', name:'圆柱的体积', sub:'底面向上平移一个高，扫过的空间就是圆柱的体积。',
+    id:'p-vol-cyl', group:'六下 · 圆柱与圆锥', name:'圆柱的体积', sub:'底面向上平移一个高，扫过的空间就是圆柱的体积。',
     tag:'六下 · 圆柱体积', params:[
       {k:'r',label:'底面半径 r',min:1,max:2.5,step:.5,val:2,unit:'cm'},
       {k:'h',label:'高 h',min:2,max:6,step:1,val:4,unit:'cm'}
@@ -2046,7 +2555,7 @@ const PRIMARY = [
     }
   },
   {
-    id:'p-vol-cone', group:'立体·体积', name:'圆锥的体积', sub:'倒三次水才能装满等底等高的圆柱，所以是三分之一。',
+    id:'p-vol-cone', group:'六下 · 圆柱与圆锥', name:'圆锥的体积', sub:'倒三次水才能装满等底等高的圆柱，所以是三分之一。',
     tag:'六下 · 圆锥体积', params:[
       {k:'r',label:'底面半径 r',min:1,max:2.5,step:.5,val:2,unit:'cm'},
       {k:'h',label:'高 h',min:2,max:5,step:1,val:3,unit:'cm'}
@@ -2060,9 +2569,9 @@ const PRIMARY = [
         value:num(Math.PI*r*r*h/3), unit:'cm³',
         steps:[
           {text:'准备一个圆锥和一个等底等高的圆柱。', at:0},
-          {text:'用圆锥装满水倒进圆柱，第 1 次只到 1/3。', at:.2},
-          {text:'第 2 次到 2/3，第 3 次刚好装满。', at:.55},
-          {text:'所以圆锥体积 = 等底等高圆柱的 1/3。', at:.8},
+          {text:'第 1 次倒满：圆柱只装了 1/3。', at:.3},
+          {text:'第 2 次：装到 2/3，第 3 次刚好装满。', at:.58},
+          {text:'所以圆锥体积 = 等底等高圆柱的 1/3。', at:.82},
           {text:`V = πr²h÷3 ≈ ${num(Math.PI*r*r*h/3)} cm³。`, at:.92}
         ],
         tip:'"等底等高"四个字不能丢。如果底或高不相等，1/3 的关系就不成立。',
@@ -2458,6 +2967,12 @@ function paramsOf(tp){
 }
 
 /* ---------- 左栏 ---------- */
+const GROUP_ORDER={
+  '三上 · 周长':1,'三下 · 面积':2,'五上 · 多边形的面积':3,'六上 · 圆的周长':4,'六上 · 圆的面积':5,
+  '五下 · 长方体和正方体':6,'六下 · 圆柱与圆锥':7,
+  '八上 · 三角形':11,'八下 · 勾股定理':12,'八下 · 平行四边形':13,'八下 · 一次函数与动点':14,
+  '九上 · 圆':21,'九上 · 二次函数':22,'九下 · 相似':31,'九下 · 反比例函数':32
+};
 function renderRail(){
   const el=$('#topicList');
   if(ST.stage==='proof'){
@@ -2480,6 +2995,7 @@ function renderRail(){
     if(!g){ g={name:t.group,items:[]}; groups.push(g); }
     g.items.push(t);
   });
+  groups.sort((a,b)=>(GROUP_ORDER[a.name]||99)-(GROUP_ORDER[b.name]||99));
   let n=0;
   el.innerHTML = groups.map(g=>{
     const items = g.items.map(t=>{
